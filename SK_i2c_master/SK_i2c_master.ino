@@ -52,7 +52,7 @@ float resistor2 = 324.3;
 #define BACK_ULTRASONIC_SENSOR_TRIGGER     51
 #define BACK_ULTRASONIC_SENSOR_ECHO        53
 
-unsigned int safe_distance = 20;
+unsigned int safe_distance = 30;
 
 #define FRONT_OBSTACLE_AVOIDANCE_SENSOR    43
 #define BACK_OBSTACLE_AVOIDANCE_SENSOR     49
@@ -69,12 +69,12 @@ int TiltServoPosition  = 90;
 int PanServoPosition   = 90;
 
 volatile int servoPos = 0;
-int ForwardServoPos[] = { 75, 90, 105, 90 };
-int ForwardLeftServoPos[] = { 180, 165, 150, 165 };
-int ForwardRightServoPos[] = { 20, 35, 50, 35 };
-int BackwardServoPos[] = { 75, 90, 105, 90 };
-int BackwardLeftServoPos[] = { 20, 35, 50, 35 };
-int BackwardRightServoPos[] = { 180, 165, 150, 165 };
+int ForwardServoPos[] = { 60, 90, 120, 90 };
+int ForwardLeftServoPos[] = { 180, 150, 120, 150 };
+int ForwardRightServoPos[] = { 20, 50, 80, 50 };
+int BackwardServoPos[] = { 60, 90, 120, 90 };
+int BackwardLeftServoPos[] = { 20, 50, 80, 50 };
+int BackwardRightServoPos[] = { 180, 150, 120, 150 };
 volatile boolean bFrontSensorServoAttached = false;
 volatile boolean bBackSensorServoAttached = false;
 
@@ -107,6 +107,20 @@ volatile boolean bForwardRightCheck = false;
 volatile boolean bReverseCheck = false;
 volatile boolean bReverseLeftCheck = false;
 volatile boolean bReverseRightCheck = false;
+
+volatile boolean bForwardCheckNow = false;
+volatile boolean bForwardLeftCheckNow = false;
+volatile boolean bForwardRightCheckNow = false;
+volatile boolean bReverseCheckNow = false;
+volatile boolean bReverseLeftCheckNow = false;
+volatile boolean bReverseRightCheckNow = false;
+
+volatile boolean bForwardCheckLast = false;
+volatile boolean bForwardLeftCheckLast = false;
+volatile boolean bForwardRightCheckLast = false;
+volatile boolean bReverseCheckLast = false;
+volatile boolean bReverseLeftCheckLast = false;
+volatile boolean bReverseRightCheckLast = false;
 
 volatile int ledPos = 0;
 int LeftLEDs[] = { 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1000, 1000 };
@@ -348,7 +362,7 @@ void setup() {
     float tempC = 0, battery_voltage = 0;
     int voltagePinReading = 0;
 
-    Serial.begin(115200);           // USB connection to Raspberry Pi
+    Serial.begin(57600);           // USB connection to Raspberry Pi
     Serial3.begin(9600);          // HC-05 Bluetooth module
     Wire.begin();
     
@@ -450,7 +464,7 @@ void setup() {
     sprintf(lcd_str, "Battery voltage: %.1f", battery_voltage);
     myGLCD.print(lcd_str, LEFT, 180);
     
-    delay(5000);
+    delay(2000);
 
 }
 
@@ -738,7 +752,8 @@ boolean check_forward()
     distance = uS / US_ROUNDTRIP_CM;
     
     /* Sonar sometimes gives 0 cms as distance, ignore it */
-    if ((distance == 0 ) || (distance >= safe_distance))  {
+//    if ((distance == 0 ) || (distance >= safe_distance))  {
+    if (distance >= safe_distance)  {
         bSonar = true;
     } else { 
         bSonar = false;
@@ -747,12 +762,19 @@ boolean check_forward()
     myGLCD.clrScr();
     serial_print("forward", distance, uS, bSonar, bObstacle);
 
+    bForwardCheckLast = bForwardCheckNow;
     if (bObstacle && bSonar) {
         myGLCD.setColor(0, 255, 0);
-        bForwardCheck = true;
+        bForwardCheckNow = true;
+        
+        if (bForwardCheckLast)
+            bForwardCheck = true;
     } else {
         myGLCD.setColor(255, 0, 0);
-        bForwardCheck = false;
+        bForwardCheckNow = false;
+
+        if (!bForwardCheckLast)
+            bForwardCheck = false;
     }
     myGLCD.fillRect(129, 0, 189, 59);
 }
@@ -772,7 +794,8 @@ boolean check_forward_left()
     distance = uS / US_ROUNDTRIP_CM;
     
     /* Sonar sometimes gives 0 cms as distance, ignore it */
-    if ((distance == 0 ) || (distance >= safe_distance))  {
+//    if ((distance == 0 ) || (distance >= safe_distance))  {
+    if (distance >= safe_distance)  {
         bSonar = true;
     } else { 
         bSonar = false;
@@ -781,12 +804,19 @@ boolean check_forward_left()
     myGLCD.clrScr();
     serial_print("forward_left", distance, uS, bSonar, bObstacle);
 
+    bForwardLeftCheckLast = bForwardLeftCheckNow;
     if (bObstacle && bSonar) {
         myGLCD.setColor(0, 255, 0);
-        bForwardLeftCheck = true;
+        bForwardLeftCheckNow = true;
+        
+        if (bForwardLeftCheckLast)
+            bForwardLeftCheck = true;
     } else {
         myGLCD.setColor(255, 0, 0);
-        bForwardLeftCheck = false;
+        bForwardLeftCheckNow = false;
+
+        if (!bForwardLeftCheckLast)
+            bForwardLeftCheck = false;
     }
     myGLCD.fillRect(0, 0, 59, 59);
 }
@@ -806,7 +836,8 @@ boolean check_forward_right()
     distance = uS / US_ROUNDTRIP_CM;
     
     /* Sonar sometimes gives 0 cms as distance, ignore it */
-    if ((distance == 0 ) || (distance >= safe_distance))  {
+//    if ((distance == 0 ) || (distance >= safe_distance))  {
+    if (distance >= safe_distance)  {
         bSonar = true;
     } else { 
         bSonar = false;
@@ -815,12 +846,19 @@ boolean check_forward_right()
     myGLCD.clrScr();
     serial_print("forward_right", distance, uS, bSonar, bObstacle);
 
+    bForwardRightCheckLast = bForwardRightCheckNow;
     if (bObstacle && bSonar) {
         myGLCD.setColor(0, 255, 0);
-        bForwardRightCheck = true;
+        bForwardRightCheckNow = true;
+        
+        if (bForwardRightCheckLast)
+            bForwardRightCheck = true;
     } else {
         myGLCD.setColor(255, 0, 0);
-        bForwardRightCheck = false;
+        bForwardRightCheckNow = false;
+        
+        if (!bForwardRightCheckLast)
+            bForwardRightCheck = false;
     }
     myGLCD.fillRect(259, 0, 319, 59);
 }
@@ -836,11 +874,12 @@ boolean check_reverse()
         bObstacle = false;
     }
 
-    uS = FrontSonar.ping(); 
+    uS = BackSonar.ping(); 
     distance = uS / US_ROUNDTRIP_CM;
     
     /* Sonar sometimes gives 0 cms as distance, ignore it */
-    if ((distance == 0 ) || (distance >= safe_distance))  {
+//    if ((distance == 0 ) || (distance >= safe_distance))  {
+    if (distance >= safe_distance)  {
         bSonar = true;
     } else { 
         bSonar = false;
@@ -849,12 +888,19 @@ boolean check_reverse()
     myGLCD.clrScr();
     serial_print("reverse", distance, uS, bSonar, bObstacle);
 
+    bReverseCheckLast = bReverseCheckNow;
     if (bObstacle && bSonar) {
         myGLCD.setColor(0, 255, 0);
-        bReverseCheck = true;
+        bReverseCheckNow = true;
+        
+        if (bReverseCheckLast)
+            bReverseCheck = true;
     } else {
         myGLCD.setColor(255, 0, 0);
-        bReverseCheck = false;
+        bReverseCheckNow = false;
+        
+        if (!bReverseCheckLast)
+            bReverseCheck = false;
     }
     myGLCD.fillRect(129, 179, 189, 239);
 }
@@ -870,11 +916,12 @@ boolean check_reverse_left()
         bObstacle = false;
     }
 
-    uS = FrontSonar.ping(); 
+    uS = BackSonar.ping(); 
     distance = uS / US_ROUNDTRIP_CM;
     
     /* Sonar sometimes gives 0 cms as distance, ignore it */
-    if ((distance == 0 ) || (distance >= safe_distance))  {
+//    if ((distance == 0 ) || (distance >= safe_distance))  {
+    if (distance >= safe_distance)  {
         bSonar = true;
     } else { 
         bSonar = false;
@@ -883,12 +930,19 @@ boolean check_reverse_left()
     myGLCD.clrScr();
     serial_print("reverse_left", distance, uS, bSonar, bObstacle);
 
+    bReverseLeftCheckLast = bReverseLeftCheckNow;
     if (bObstacle && bSonar) {
         myGLCD.setColor(0, 255, 0);
-        bReverseLeftCheck = true;
+        bReverseLeftCheckNow = true;
+        
+        if (bReverseLeftCheckLast)
+            bReverseLeftCheck = true;
     } else {
         myGLCD.setColor(255, 0, 0);
-        bReverseLeftCheck = false;
+        bReverseLeftCheckNow = false;
+        
+        if (!bReverseLeftCheckLast)
+            bReverseLeftCheck = false;
     }
     myGLCD.fillRect(0, 179, 59, 239);
 }
@@ -904,11 +958,12 @@ boolean check_reverse_right()
         bObstacle = false;
     }
 
-    uS = FrontSonar.ping(); 
+    uS = BackSonar.ping(); 
     distance = uS / US_ROUNDTRIP_CM;
     
     /* Sonar sometimes gives 0 cms as distance, ignore it */
-    if ((distance == 0 ) || (distance >= safe_distance))  {
+//    if ((distance == 0 ) || (distance >= safe_distance))  {
+    if (distance >= safe_distance)  {
         bSonar = true;
     } else { 
         bSonar = false;
@@ -917,12 +972,19 @@ boolean check_reverse_right()
     myGLCD.clrScr();
     serial_print("reverse_right", distance, uS, bSonar, bObstacle);
 
+    bReverseRightCheckLast = bReverseRightCheckNow;
     if (bObstacle && bSonar) {
         myGLCD.setColor(0, 255, 0);
-        bReverseRightCheck = true;
+        bReverseRightCheckNow = true;
+        
+        if (bReverseRightCheckLast)
+            bReverseRightCheck = true;
     } else {
         myGLCD.setColor(255, 0, 0);
-        bReverseRightCheck = false;
+        bReverseRightCheckNow = false;
+        
+        if (!bReverseRightCheckLast)
+            bReverseRightCheck = false;
     }
     myGLCD.fillRect(259, 179, 319, 239);
 }
@@ -1051,52 +1113,43 @@ void getInput(void)
     {
         led_counter1 = 0;
 
-        if (Serial3.available())
+        // Dont try to process each and every command.  Otherwise
+        // the arduino may be busy for a long time after the user
+        // has released a command button.
+        while (Serial3.available() && serial_count < 10)
         {
-            /*
-            ** Dont try to process each and every command.  Otherwise
-            ** the arduino may be busy for a long time after the user
-            ** has released a command button.
-            */
-            while (Serial3.available() && serial_count < 10)
+            serial_count++;
+            temp_cmd = Serial3.read();
+            if (strchr(ACCEPTED_INPUTS, temp_cmd))
             {
-                serial_count++;
-                temp_cmd = Serial3.read();
-                if (strchr(ACCEPTED_INPUTS, temp_cmd))
-                {
-                    Serial.print("temp_cmd: ");Serial.println(temp_cmd);
-                    cmd = temp_cmd;
-                    Serial.print("cmd: ");Serial.println(cmd);
-                }
-                else
-                {
-                    Serial.print("inv temp_cmd: ");Serial.println(temp_cmd);
-                }
+                Serial.print("btemp_cmd: ");Serial.print(temp_cmd);Serial.print(" ");Serial.println(count);
+                cmd = temp_cmd;
+                count = 0;
+                Serial.print("bcmd: ");Serial.print(cmd);Serial.print(" ");Serial.println(count);
+            }
+            else
+            {
+                Serial.print("binv temp_cmd: ");Serial.print(temp_cmd);Serial.print(" ");Serial.println(count);
             }
         }
     
-        if (Serial.available())
+        while (Serial.available() && serial_count < 10)
         {
-            while (Serial.available() && serial_count < 10)
+            serial_count++;
+            temp_cmd = Serial.read();
+            if (strchr(ACCEPTED_INPUTS, temp_cmd))
             {
-                serial_count++;
-                temp_cmd = Serial3.read();
-                if (strchr(ACCEPTED_INPUTS, temp_cmd))
-                {
-                    Serial.print("temp_cmd: ");Serial.println(temp_cmd);
-                    cmd = temp_cmd;
-                    Serial.print("cmd: ");Serial.println(cmd);
-                }
-                else
-                {
-                    Serial.print("inv temp_cmd: ");Serial.println(temp_cmd);
-                }
+                Serial.print("temp_cmd: ");Serial.print(temp_cmd);Serial.print(" ");Serial.println(count);
+                cmd = temp_cmd;
+                count = 0;
+                Serial.print("cmd: ");Serial.print(cmd);Serial.print(" ");Serial.println(count);
+            }
+            else
+            {
+                Serial.print("inv temp_cmd: ");Serial.print(temp_cmd);Serial.print(" ");Serial.println(count);
             }
         }
-    }
-    else
-    {
-        cmd = ' ';
+    
     }
 }
 
@@ -1125,50 +1178,6 @@ void loop() {
         }    
     }
       
-
-
-/*
-    checkSensors();
-    
-    if (prev_cmd == 'F') {
-        if (!bForwardCheck)
-        {
-            prev_cmd = ' ';
-            stop();
-        }
-    } else if (prev_cmd == 'B') {
-        if (!bReverseCheck)
-        {
-            prev_cmd = ' ';
-            stop();
-        }
-    } else if (prev_cmd == 'G') {
-        if (!bForwardLeftCheck)
-        {
-            prev_cmd = ' ';
-            stop();
-        }
-    } else if (prev_cmd == 'I') {
-        if (!bForwardRightCheck)
-        {
-            prev_cmd = ' ';
-            stop();
-        }
-    } else if (prev_cmd == 'H') {
-        if (!bReverseLeftCheck)
-        {
-            prev_cmd = ' ';
-            stop();
-        }
-    } else if (prev_cmd == 'J') {
-        if (!bReverseRightCheck)
-        {
-            prev_cmd = ' ';
-            stop();
-        }
-    }
-*/
-
     getInput();
 
     if ((cmd == 'F') || (cmd == 'G') || (cmd == 'I')) {
@@ -1190,44 +1199,30 @@ void loop() {
     if (cmd == 'F')
     {
         forward();
-        prev_cmd = cmd;
-        count = 0;
     }
     else if (cmd == 'B')
     {
         reverse();
-        prev_cmd = cmd;
-        count = 0;
     }
     else if (cmd == 'G')
     {
         forward_left();
-        prev_cmd = cmd;
-        count = 0;
     }
     else if (cmd == 'I')
     {
         forward_right();
-        prev_cmd = cmd;
-        count = 0;
     }
     else if (cmd == 'H')
     {
         reverse_left();
-        prev_cmd = cmd;
-        count = 0;
     }
     else if (cmd == 'J')
     {
         reverse_right();
-        prev_cmd = cmd;
-        count = 0;
     }
     else if (cmd == 'S')
     {
         stop();
-        prev_cmd = cmd;            
-        count = 0;
     }
     else if (cmd == 'U')
     {
