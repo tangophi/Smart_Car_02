@@ -77,6 +77,8 @@ int BackwardLeftServoPos[] = { 20, 50, 80, 50 };
 int BackwardRightServoPos[] = { 180, 150, 120, 150 };
 volatile boolean bFrontSensorServoAttached = false;
 volatile boolean bBackSensorServoAttached = false;
+volatile boolean bPanSensorServoAttached = false;
+volatile boolean bTiltSensorServoAttached = false;
 
 NewPing FrontSonar(FRONT_ULTRASONIC_SENSOR_TRIGGER, FRONT_ULTRASONIC_SENSOR_ECHO, MAX_DISTANCE); 
 NewPing BackSonar(BACK_ULTRASONIC_SENSOR_TRIGGER, BACK_ULTRASONIC_SENSOR_ECHO, MAX_DISTANCE); 
@@ -96,6 +98,8 @@ char output_string[256];
 char debug_strings[10][256] = {' ',' ',' ',' ',' ',' ',' ',' ',' ',' '};
 char null_string[256] = "                                                                                                                             ";
 char *str;
+char lcd_str[256];
+
 boolean bObstacle = false, bSonar = false;
 unsigned int uS;
 unsigned int distance;
@@ -139,8 +143,8 @@ volatile int led_color1 = 0;
 volatile int led_color2 = 70;
 volatile int led_counter1 = 0;
 volatile int led_counter2 = 0;
-int idle_start = 100;
-int idle_end = 200;
+int idle_start = 6000;
+int idle_end = 6200;
 
 int htmlcolorcode[] = {
 0xF0F8FF,
@@ -356,52 +360,14 @@ void serial_println (char *mesg, char c)
     }
 }
 
-void setup() {
-    sensor_t sensor;
-    char lcd_str[256];
-    float tempC = 0, battery_voltage = 0;
-    int voltagePinReading = 0;
+float tempC = 0, battery_voltage = 0;
+int voltagePinReading = 0;
+sensor_t sensor;
+sensors_event_t event; 
+  
 
-    Serial.begin(57600);           // USB connection to Raspberry Pi
-    Serial3.begin(9600);          // HC-05 Bluetooth module
-    Wire.begin();
-    
-    Serial.println("Starting Arduino Mega ...................");
-
-    NewPing::timer_ms(100, ledStrip);
-//    NewPing::timer_ms(100, checkSensors);
-
-//    analogReference(INTERNAL1V1);
-
-//    Timer3.initialize(100000);
-//    Timer3.attachInterrupt(ledStrip);
-
-//    Timer3.initialize(10000);
-//    Timer3.attachInterrupt(getInput);
-    
-    pinMode(FRONT_ULTRASONIC_SENSOR_TRIGGER, OUTPUT);
-    pinMode(FRONT_ULTRASONIC_SENSOR_ECHO,    INPUT);
-    pinMode(BACK_ULTRASONIC_SENSOR_TRIGGER,  OUTPUT);
-    pinMode(BACK_ULTRASONIC_SENSOR_ECHO,     INPUT);
-
-    pinMode(FRONT_OBSTACLE_AVOIDANCE_SENSOR, INPUT);
-    pinMode(BACK_OBSTACLE_AVOIDANCE_SENSOR,  INPUT);
-
-    myGLCD.InitLCD();
-    myGLCD.setFont(SmallFont);
-    myGLCD.clrScr();
-    
-    FastLED.addLeds<NEOPIXEL, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
- 
-    /* Initialise the sensor */
-    if(!mag.begin())
-    {
-        /* There was a problem detecting the HMC5883 ... check your connections */
-        Serial.println("Ooops, no HMC5883 detected ... Check your wiring!");
-    }    
-
-
-                
+void getSensorReadings()
+{
     Serial.print  ("Mag Sensor:   "); Serial.println(sensor.name);
     Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
     Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
@@ -410,7 +376,6 @@ void setup() {
     Serial.print  ("Resolution:   "); Serial.print(sensor.resolution); Serial.println(" uT"); 
 
     // Get a new sensor event
-    sensors_event_t event; 
     mag.getEvent(&event);
  
     // Display the results (magnetic vector values are in micro-Tesla (uT))
@@ -441,31 +406,89 @@ void setup() {
     // Convert radians to degrees for readability.
     float headingDegrees = heading * 180/M_PI; 
   
-    Serial.print("Heading (degrees): "); Serial.println(headingDegrees);
-  
-  
     analogReference(INTERNAL1V1);
     tempC = analogRead(PIN_TEMPERATURE)/9.31;
-    Serial.print("Temperature: "); Serial.println(tempC);
-
-    sprintf(lcd_str, "Temperature: %.1f", tempC);
-    myGLCD.print(lcd_str, LEFT, 130);
-    sprintf(lcd_str, "Heading: %.1f", headingDegrees);
-    myGLCD.print(lcd_str, LEFT, 160);
 
     analogReference(DEFAULT);
-    
     voltagePinReading = analogRead(PIN_BATTERY_VOLTAGE);
     battery_voltage = ((float)voltagePinReading) * (5.0 /1024.0) * (resistor1 + resistor2) / resistor2;
 
+    Serial.print("Heading (degrees): "); Serial.println(headingDegrees);
+    Serial.print("Temperature: "); Serial.println(tempC);
     Serial.print("voltagePinReading: "); Serial.println(voltagePinReading);
-    
     Serial.print("Battery voltage: "); Serial.println(battery_voltage);
-    sprintf(lcd_str, "Battery voltage: %.1f", battery_voltage);
+
+
+    dtostrf(tempC, 7, 2, str); sprintf(lcd_str, "Temperature: %s", str);
+    myGLCD.print(lcd_str, LEFT, 130);
+    dtostrf(headingDegrees, 7, 2, str);  sprintf(lcd_str, "Heading: %s", str);
+    myGLCD.print(lcd_str, LEFT, 160);
+    dtostrf(battery_voltage, 6, 2, str); sprintf(lcd_str, "Battery voltage: %s", str);
     myGLCD.print(lcd_str, LEFT, 180);
+
+}
+
+void initializeServos()
+{
+    attach_front_sensor_servo();
+    attach_back_sensor_servo();
+    attach_pan_sensor_servo();
+    attach_tilt_sensor_servo();
+  
+    FrontServo.write(90);
+    BackServo.write(90);
+    PanServo.write(90);
+    TiltServo.write(90);
+    delay(1000);
+    
+    detach_front_sensor_servo();
+    detach_back_sensor_servo();
+    detach_pan_sensor_servo();
+    detach_tilt_sensor_servo();
+}
+
+void setup() {
+    Serial.begin(57600);           // USB connection to Raspberry Pi
+    Serial3.begin(9600);           // HC-05 Bluetooth module
+    Wire.begin();
+
+    // Initialise the sensor
+    if(!mag.begin())
+    {
+        /* There was a problem detecting the HMC5883 ... check your connections */
+        Serial.println("Ooops, no HMC5883 detected ... Check your wiring!");
+    }    
+                
+    
+    Serial.println("Starting Arduino Mega ...................");
+
+    NewPing::timer_ms(100, ledStrip);
+//    NewPing::timer_ms(100, checkSensors);
+
+//    Timer3.initialize(100000);
+//    Timer3.attachInterrupt(ledStrip);
+
+//    Timer3.initialize(10000);
+//    Timer3.attachInterrupt(getInput);
+    
+    pinMode(FRONT_ULTRASONIC_SENSOR_TRIGGER, OUTPUT);
+    pinMode(FRONT_ULTRASONIC_SENSOR_ECHO,    INPUT);
+    pinMode(BACK_ULTRASONIC_SENSOR_TRIGGER,  OUTPUT);
+    pinMode(BACK_ULTRASONIC_SENSOR_ECHO,     INPUT);
+    pinMode(FRONT_OBSTACLE_AVOIDANCE_SENSOR, INPUT);
+    pinMode(BACK_OBSTACLE_AVOIDANCE_SENSOR,  INPUT);
+
+    myGLCD.InitLCD();
+    myGLCD.setFont(SmallFont);
+    myGLCD.clrScr();
+    
+    FastLED.addLeds<NEOPIXEL, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+
+    getSensorReadings();
+    initializeServos();
     
     delay(2000);
-
+    count = 0;
 }
 
 void ledStrip(void)
@@ -642,14 +665,13 @@ void ledStrip(void)
             }
             else if ((led_counter1 + 30) > idle_end) {
                 myGLCD.setColor(0,255, 0);
-//                sprintf(lcd_str, "ZZZzzz... %d %d %d %d", color1, led_color1, color2, led_color2);
                 sprintf(lcd_str, "ZZZzzz...");
                 myGLCD.print(lcd_str, CENTER, 200);
             }
             else {
              
                 myGLCD.setColor(255, 0, 0);
-                sprintf(lcd_str, "On standby... %d %d", led_color1, led_color2);
+                sprintf(lcd_str, "On standby. %d %d", led_color1, led_color2);
                 myGLCD.print(lcd_str, CENTER, 100);
             }
                         
@@ -658,11 +680,7 @@ void ledStrip(void)
             if (led_counter2 > 25) {
                 led_color1 = random(0,142);
                 led_color2 = random(0,142);
-/*                if (led_color1 > 143)
-                    led_color1=0;
-                if (led_color2 > 143)
-                    led_color2=0;
-*/
+
                 led_counter2 = 0;
             }
       
@@ -678,7 +696,6 @@ void ledStrip(void)
     if (ledPos == 4)
         ledPos = 0;
 }
-
 
 void attach_front_sensor_servo()
 {
@@ -1048,6 +1065,30 @@ void reverse_left()
     }
 }
 
+void attach_pan_sensor_servo()
+{
+    PanServo.attach(PAN_SERVO);
+    bPanSensorServoAttached = true;
+}
+
+void attach_tilt_sensor_servo()
+{
+    TiltServo.attach(TILT_SERVO);
+    bTiltSensorServoAttached = true;
+}
+
+void detach_pan_sensor_servo()
+{
+    PanServo.detach();
+    bPanSensorServoAttached = false;
+}
+
+void detach_tilt_sensor_servo()
+{
+    TiltServo.detach();
+    bTiltSensorServoAttached = false;
+}
+
 
 void reverse_right()
 {
@@ -1061,11 +1102,9 @@ void camera_up()
 {
     if (TiltServoPosition > 40)
     {
-        TiltServoPosition -= 10;
-        TiltServo.attach(TILT_SERVO);
+        TiltServoPosition -= 1;
         TiltServo.write(TiltServoPosition);
-        delay(500);
-        TiltServo.detach();
+        delay(100);
     }
 }
 
@@ -1073,11 +1112,9 @@ void camera_down()
 {
     if (TiltServoPosition < 180)
     {
-        TiltServoPosition += 10;
-        TiltServo.attach(TILT_SERVO);
+        TiltServoPosition += 1;
         TiltServo.write(TiltServoPosition);
-        delay(500);
-        TiltServo.detach();
+        delay(100);
     }
 }
 
@@ -1085,11 +1122,9 @@ void camera_left()
 {
     if (PanServoPosition < 180)
     {
-        PanServoPosition += 10;
-        PanServo.attach(PAN_SERVO);
+        PanServoPosition += 1;
         PanServo.write(PanServoPosition);
-        delay(500);
-        PanServo.detach();
+        delay(100);
     }
 }
 
@@ -1097,11 +1132,9 @@ void camera_right()
 {
     if (PanServoPosition > 0)
     {
-        PanServoPosition -= 10;
-        PanServo.attach(PAN_SERVO);
+        PanServoPosition -= 1;
         PanServo.write(PanServoPosition);
-        delay(500);
-        PanServo.detach();
+        delay(100);
     }
 }
 
@@ -1168,6 +1201,10 @@ void loop() {
             detach_front_sensor_servo();
         if (bBackSensorServoAttached)
             detach_back_sensor_servo();
+        if (bPanSensorServoAttached)
+            detach_pan_sensor_servo();
+        if (bTiltSensorServoAttached)
+            detach_tilt_sensor_servo();
 
         if (count < 200) {
             led_cmd = 'Z';
@@ -1185,12 +1222,40 @@ void loop() {
             attach_front_sensor_servo();
         if (bBackSensorServoAttached)
             detach_back_sensor_servo();
+        if (bPanSensorServoAttached)
+            detach_pan_sensor_servo();
+        if (bTiltSensorServoAttached)
+            detach_tilt_sensor_servo();
     }
     else if ((cmd == 'B') || (cmd == 'H') || (cmd == 'J')) {
-        if (!bBackSensorServoAttached)
-            attach_back_sensor_servo();
         if (bFrontSensorServoAttached)
             detach_front_sensor_servo();
+        if (!bBackSensorServoAttached)
+            attach_back_sensor_servo();
+        if (bPanSensorServoAttached)
+            detach_pan_sensor_servo();
+        if (bTiltSensorServoAttached)
+            detach_tilt_sensor_servo();
+    }
+    else if ((cmd == 'U') || (cmd == 'D')) {
+        if (bFrontSensorServoAttached)
+            detach_front_sensor_servo();
+        if (bBackSensorServoAttached)
+            detach_back_sensor_servo();
+        if (bPanSensorServoAttached)
+            detach_pan_sensor_servo();
+        if (!bTiltSensorServoAttached)
+            attach_tilt_sensor_servo();
+    }
+    else if ((cmd == 'L') || (cmd == 'R')) {
+        if (bFrontSensorServoAttached)
+            detach_front_sensor_servo();
+        if (bBackSensorServoAttached)
+            detach_back_sensor_servo();
+        if (!bPanSensorServoAttached)
+            attach_pan_sensor_servo();
+        if (bTiltSensorServoAttached)
+            detach_tilt_sensor_servo();
     }
     
     checkSensors();
