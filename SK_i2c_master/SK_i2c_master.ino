@@ -37,8 +37,13 @@ UTFT myGLCD(ITDB32S,38,39,40,41);
 #define PIN_TILT_SWITCHPIN_TILT_SWITCH  12
 
 #define PIN_TEMPERATURE       1  // Analog
-#define PIN_BATTERY_VOLTAGE   7  // Analog
+#define PIN_BATTERY_VOLTAGE   6  // Analog
+#define PIN_MAIN_VOLTAGE      7  // Analog
 
+#define PIN_RELAY_1     44
+#define PIN_RELAY_2     42
+#define PIN_RELAY_3     8
+#define PIN_RELAY_4     9
 
 float resistor1 = 993;
 float resistor2 = 324.3;
