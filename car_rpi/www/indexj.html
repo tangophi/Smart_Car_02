@@ -1,0 +1,118 @@
+
+
+<html>
+<head>
+<script Language="Javascript">
+function forward()
+{
+    document.location="cgi-bin/forward.cgi";
+}
+function forward_left()
+{
+    document.location="cgi-bin/forward_left.cgi";
+}
+function forward_right()
+{
+    document.location="cgi-bin/forward_right.cgi";
+}
+function reverse()
+{
+    document.location="cgi-bin/reverse.cgi";
+}
+function reverse_left()
+{
+    document.location="cgi-bin/reverse_left.cgi";
+}
+function reverse_right()
+{
+    document.location="cgi-bin/reverse_right.cgi";
+}
+function stop()
+{
+    document.location="cgi-bin/stop.cgi";
+}
+function up()
+{
+    document.location="cgi-bin/up.cgi";
+}
+function down()
+{
+    document.location="cgi-bin/down.cgi";
+}
+function left()
+{
+    document.location="cgi-bin/left.cgi";
+}
+function right()
+{
+    document.location="cgi-bin/right.cgi";
+}
+</script>
+</head>
+<body>
+
+    <TABLE BORDER=0 align="center">
+        <tr>
+            <td align="center">
+                    <center>
+                        <b> Rover </b>
+                    </center>
+                    <img src="http://192.168.0.157:8080/?action=stream" width="640" height="480"/>
+            </td>
+            <td align="center">
+                <TABLE BORDER = 0>
+                    <tr>
+                        <th> Rover Camera </th>
+                    </tr>
+                    <tr>
+                        <td align="center">
+                            <img src="/up.jpg" width="52" height="45" id="U" onmousedown="up()" onmouseup="stop(event)" onmouseout="stop(event)">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center">
+                            <img src="/left.jpg" width="52" height="45" id="L" onmousedown="left()" onmouseup="stop(event)" onmouseout="stop(event)">
+                            <img src="/right.jpg" width="52" height="45" id="R" onmousedown="right()" onmouseup="stop(event)" onmouseout="stop(event)">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center">
+                            <img src="/down.jpg" width="52" height="45" id="D" onmousedown="down()" onmouseup="stop(event)" onmouseout="stop(event)">
+                        </td>
+                    </tr>
+                </TABLE>
+            </td>
+        </tr>
+        <tr>
+            <td align="center">
+                <TABLE BORDER = 0>
+                    <tr>
+                        <th> Car Controls</th>
+                    </tr>
+                    <tr>
+                        <td align="center">
+                            <img src="/forward_left.jpg" width="52" height="45" id="G" onmousedown="forward_left()" onmouseup="stop(event)">
+                            <img src="/forward.jpg" width="52" height="45" id="F" onmousedown="forward()" onmouseup="stop(event)" onmouseout="stop(event)">
+                            <img src="/forward_right.jpg" width="52" height="45" id="I" onmousedown="forward_right()" onmouseup="stop(event)" onmouseout="stop(event)">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center">
+                            <img src="/stop.jpg" width="52" height="45" id="S" onmousedown="stop(event)" onmouseup="stop(event)">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center">
+                            <img src="/reverse_left.jpg" width="52" height="45" id="H" onmousedown="reverse_left()" onmouseup="stop(event)" onmouseout="stop(event)">
+                            <img src="/reverse.jpg" width="52" height="45" id="B" onmousedown="reverse()" onmouseup="stop(event)" onmouseout="stop(event)">
+                            <img src="/reverse_right.jpg" width="52" height="45" id="J" onmousedown="reverse_right()" onmouseup="stop(event)" onmouseout="stop(event)">
+                        </td>
+                    </tr>
+                </TABLE>
+            </td>
+        </tr>
+
+    </TABLE>
+
+</body>
+</html>
