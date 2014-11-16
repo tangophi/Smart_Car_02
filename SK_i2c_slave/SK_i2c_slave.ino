@@ -7,8 +7,8 @@ AF_DCMotor LBmotor(4, MOTOR34_64KHZ);   // left back wheel
 AF_DCMotor LFmotor(3, MOTOR34_64KHZ);   // left front wheel
 
 int min_speed = 0;
-int max_speed = 100;
-int max_speed2 = 250;
+int max_speed = 10;
+int max_speed2 = 25;
 int move_duration = 1;
 char cmd = ' ';
 char prev_cmd = ' ';
@@ -16,6 +16,7 @@ int iteration_delay = 0;
 int loop_count = 0;
 int reset_delay = 10;
 long int count = 0;
+int speed = 1;
 
 void setup() {
     Serial.begin(9600);           // set up Serial library at 9600 bps
@@ -69,10 +70,10 @@ void forward(){
     LFmotor.run(FORWARD);
 
     for (i=0; i<move_duration; i++) {
-        RBmotor.setSpeed(max_speed);  
-        RFmotor.setSpeed(max_speed);  
-        LBmotor.setSpeed(max_speed);  
-        LFmotor.setSpeed(max_speed);  
+        RBmotor.setSpeed(max_speed*speed);  
+        RFmotor.setSpeed(max_speed*speed);  
+        LBmotor.setSpeed(max_speed*speed);  
+        LFmotor.setSpeed(max_speed*speed);  
         delay(iteration_delay);
     }
 }
@@ -85,10 +86,10 @@ void reverse(){
     LFmotor.run(BACKWARD);
 
     for (i=0; i<move_duration; i++) {
-        RBmotor.setSpeed(max_speed);  
-        RFmotor.setSpeed(max_speed);  
-        LBmotor.setSpeed(max_speed);  
-        LFmotor.setSpeed(max_speed);  
+        RBmotor.setSpeed(max_speed*speed);  
+        RFmotor.setSpeed(max_speed*speed);  
+        LBmotor.setSpeed(max_speed*speed);  
+        LFmotor.setSpeed(max_speed*speed);  
         delay(iteration_delay);
     }
 }
@@ -101,8 +102,8 @@ void forward_left(){
     LFmotor.run(FORWARD);
 
     for (i=0; i<move_duration; i++) {
-        RBmotor.setSpeed(max_speed2);  
-        RFmotor.setSpeed(max_speed2);  
+        RBmotor.setSpeed(max_speed2*speed);  
+        RFmotor.setSpeed(max_speed2*speed);  
         LBmotor.setSpeed(min_speed);  
         LFmotor.setSpeed(min_speed);  
         delay(iteration_delay);
@@ -119,8 +120,8 @@ void forward_right(){
     for (i=0; i<move_duration; i++) {
         RBmotor.setSpeed(min_speed);  
         RFmotor.setSpeed(min_speed);  
-        LBmotor.setSpeed(max_speed2);  
-        LFmotor.setSpeed(max_speed2);  
+        LBmotor.setSpeed(max_speed2*speed);  
+        LFmotor.setSpeed(max_speed2*speed);  
         delay(iteration_delay);
     }
 }
@@ -133,8 +134,8 @@ void reverse_left(){
     LFmotor.run(BACKWARD);
 
     for (i=0; i<move_duration; i++) {
-        RBmotor.setSpeed(max_speed2);  
-        RFmotor.setSpeed(max_speed2);  
+        RBmotor.setSpeed(max_speed2*speed);  
+        RFmotor.setSpeed(max_speed2*speed);  
         LBmotor.setSpeed(min_speed);  
         LFmotor.setSpeed(min_speed); 
         delay(iteration_delay);
@@ -151,8 +152,8 @@ void reverse_right(){
     for (i=0; i<move_duration; i++) {
         RBmotor.setSpeed(min_speed);  
         RFmotor.setSpeed(min_speed);  
-        LBmotor.setSpeed(max_speed2);  
-        LFmotor.setSpeed(max_speed2);  
+        LBmotor.setSpeed(max_speed2*speed);  
+        LFmotor.setSpeed(max_speed2*speed);  
         delay(iteration_delay);
     }
 }
@@ -168,20 +169,12 @@ void loop() {
             reverse();
         } else if (prev_cmd == 'G') {
             forward_left();
-//            if (count > 50) 
-//                prev_cmd = ' ';
         } else if (prev_cmd == 'I') {
             forward_right();
-//            if (count > 50) 
-//               prev_cmd = ' ';
         } else if (prev_cmd == 'H') {
             reverse_left();
-//            if (count > 50) 
-//                prev_cmd = ' ';
         } else if (prev_cmd == 'J') {
             reverse_right();
-//            if (count > 50) 
-//                prev_cmd = ' ';
         }      
     }
     else
@@ -227,4 +220,40 @@ void loop() {
         cmd = ' ';
         count = 0;
     }
+    else if (cmd == '1')
+    {
+        speed = 1;
+    }
+    else if (cmd == '2')
+    {
+        speed = 2;
+    }
+    else if (cmd == '3')
+    {
+        speed = 3;
+    }
+    else if (cmd == '4')
+    {
+        speed = 4;
+    }
+    else if (cmd == '5')
+    {
+        speed = 5;
+    }
+    else if (cmd == '6')
+    {
+        speed = 6;
+    }
+    else if (cmd == '7')
+    {
+        speed = 7;
+    }
+    else if (cmd == '8')
+    {
+        speed = 8;
+    }
+    else if (cmd == '9')
+    {
+        speed = 9;
+    }    
 }

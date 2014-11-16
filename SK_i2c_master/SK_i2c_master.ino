@@ -38,7 +38,7 @@ UTFT myGLCD(ITDB32S,38,39,40,41);
 
 #define PIN_TEMPERATURE       1  // Analog
 #define PIN_BATTERY_VOLTAGE   6  // Analog
-#define PIN_MAIN_VOLTAGE      7  // Analog
+#define PIN_MAINS_VOLTAGE     7  // Analog
 
 #define PIN_RELAY_1     44
 #define PIN_RELAY_2     42
@@ -93,17 +93,18 @@ Servo BackServo;
 Servo PanServo;
 Servo TiltServo;
 
-char *ACCEPTED_INPUTS = "FBGIHJSDURL";
-volatile char cmd = ' ';
+char *ACCEPTED_INPUTS = "FBGIHJSDURLWwVvXx123456789";
+volatile char cmd = 'A';
 volatile char temp_cmd = ' ';
 char prev_cmd = ' ';
-volatile char led_cmd = 'A';
 int i=0,j=90,k=180,l=0;
 char output_string[256];
 char debug_strings[10][256] = {' ',' ',' ',' ',' ',' ',' ',' ',' ',' '};
 char null_string[256] = "                                                                                                                             ";
-char *str;
+char str[256];
 char lcd_str[256];
+
+float tempC = 0, battery_voltage = 0, mains_voltage = 0;
 
 boolean bObstacle = false, bSonar = false;
 unsigned int uS;
@@ -131,11 +132,23 @@ volatile boolean bReverseCheckLast = false;
 volatile boolean bReverseLeftCheckLast = false;
 volatile boolean bReverseRightCheckLast = false;
 
+volatile boolean bDockingMode = false;
+volatile boolean bPowerFromBattery = true;
+volatile boolean bPowerFromMains = true;
+
+volatile boolean bFrontLights = false;
+volatile boolean bBackLights = false;
+
+volatile boolean bGetSensorReadings = true;
+
 volatile int ledPos = 0;
 int LeftLEDs[] = { 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1000, 1000 };
 int RightLEDs[] = { 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 1000, 1000 };
 int FrontLEDs[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 1000, 1000 };
 int BackLEDs[] = { 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 1000, 1000 };
+
+int FrontLightLEDs[] = { 7, 8, 9, 10, 11, 12, 13, 14 };
+int BackLightLEDs[] = { 29, 30, 31, 32, 33, 34, 35, 36 };
 
 CRGB::HTMLColorCode Color1 = CRGB::Black;
 CRGB::HTMLColorCode Color2 = CRGB::Navy;
@@ -148,8 +161,10 @@ volatile int led_color1 = 0;
 volatile int led_color2 = 70;
 volatile int led_counter1 = 0;
 volatile int led_counter2 = 0;
-int idle_start = 6000;
-int idle_end = 6200;
+volatile int idle_start = 300;
+volatile int idle_end   = idle_start + 10;
+
+int serial_count = 0;
 
 int htmlcolorcode[] = {
 0xF0F8FF,
@@ -331,6 +346,8 @@ void serial_print (char *direction, int secs, int cms, boolean bS, boolean bO)
 
         Serial.println(output_string);
         myGLCD.print(output_string, CENTER, 70);
+        
+        myGLCD.setFont(BigFont);
     }
 }
 
@@ -362,17 +379,16 @@ void serial_println (char *mesg, char c)
         myGLCD.print(debug_strings[7], LEFT, 150);
         myGLCD.print(debug_strings[8], LEFT, 160);
         myGLCD.print(debug_strings[9], LEFT, 170);
+        myGLCD.setFont(BigFont);
     }
 }
 
-float tempC = 0, battery_voltage = 0;
-int voltagePinReading = 0;
-sensor_t sensor;
-sensors_event_t event; 
-  
-
 void getSensorReadings()
 {
+    int analogPinReading = 0;
+    sensor_t sensor;
+    sensors_event_t event; 
+  
     Serial.print  ("Mag Sensor:   "); Serial.println(sensor.name);
     Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
     Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
@@ -411,26 +427,28 @@ void getSensorReadings()
     // Convert radians to degrees for readability.
     float headingDegrees = heading * 180/M_PI; 
   
-    analogReference(INTERNAL1V1);
-    tempC = analogRead(PIN_TEMPERATURE)/9.31;
+    analogPinReading = analogRead(PIN_TEMPERATURE);
+    tempC = ((float)analogPinReading)*0.48828125;
 
-    analogReference(DEFAULT);
-    voltagePinReading = analogRead(PIN_BATTERY_VOLTAGE);
-    battery_voltage = ((float)voltagePinReading) * (5.0 /1024.0) * (resistor1 + resistor2) / resistor2;
+    analogPinReading = analogRead(PIN_BATTERY_VOLTAGE);
+    battery_voltage = ((float)analogPinReading) * (5.0 /1024.0) * (resistor1 + resistor2) / resistor2;
+
+    analogPinReading = analogRead(PIN_MAINS_VOLTAGE);
+    mains_voltage = ((float)analogPinReading) * (5.0 /1024.0) * (resistor1 + resistor2) / resistor2;
 
     Serial.print("Heading (degrees): "); Serial.println(headingDegrees);
     Serial.print("Temperature: "); Serial.println(tempC);
-    Serial.print("voltagePinReading: "); Serial.println(voltagePinReading);
     Serial.print("Battery voltage: "); Serial.println(battery_voltage);
+    Serial.print("Mains voltage: "); Serial.println(mains_voltage);
 
-
-    dtostrf(tempC, 7, 2, str); sprintf(lcd_str, "Temperature: %s", str);
-    myGLCD.print(lcd_str, LEFT, 130);
-    dtostrf(headingDegrees, 7, 2, str);  sprintf(lcd_str, "Heading: %s", str);
+    dtostrf(tempC, 5, 2, str);           sprintf(lcd_str, "Temperature: %sC", str);
+    myGLCD.print(lcd_str, LEFT, 100);
+    dtostrf(headingDegrees, 6, 2, str);  sprintf(lcd_str, "Heading: %s\%", str);
+    myGLCD.print(lcd_str, LEFT, 120);
+    dtostrf(battery_voltage, 5, 2, str); sprintf(lcd_str, "Battery: %s v", str);
+    myGLCD.print(lcd_str, LEFT, 140);
+    dtostrf(mains_voltage, 5, 2, str);   sprintf(lcd_str, "Mains  : %s v", str);
     myGLCD.print(lcd_str, LEFT, 160);
-    dtostrf(battery_voltage, 6, 2, str); sprintf(lcd_str, "Battery voltage: %s", str);
-    myGLCD.print(lcd_str, LEFT, 180);
-
 }
 
 void initializeServos()
@@ -463,19 +481,11 @@ void setup() {
         /* There was a problem detecting the HMC5883 ... check your connections */
         Serial.println("Ooops, no HMC5883 detected ... Check your wiring!");
     }    
-                
     
     Serial.println("Starting Arduino Mega ...................");
 
-    NewPing::timer_ms(100, ledStrip);
-//    NewPing::timer_ms(100, checkSensors);
+    analogReference(DEFAULT);
 
-//    Timer3.initialize(100000);
-//    Timer3.attachInterrupt(ledStrip);
-
-//    Timer3.initialize(10000);
-//    Timer3.attachInterrupt(getInput);
-    
     pinMode(FRONT_ULTRASONIC_SENSOR_TRIGGER, OUTPUT);
     pinMode(FRONT_ULTRASONIC_SENSOR_ECHO,    INPUT);
     pinMode(BACK_ULTRASONIC_SENSOR_TRIGGER,  OUTPUT);
@@ -483,17 +493,122 @@ void setup() {
     pinMode(FRONT_OBSTACLE_AVOIDANCE_SENSOR, INPUT);
     pinMode(BACK_OBSTACLE_AVOIDANCE_SENSOR,  INPUT);
 
+    pinMode(PIN_RELAY_1,                     OUTPUT);
+    pinMode(PIN_RELAY_2,                     OUTPUT);
+    pinMode(PIN_RELAY_3,                     OUTPUT);
+    pinMode(PIN_RELAY_4,                     OUTPUT);
+
+    digitalWrite(PIN_RELAY_1, HIGH);
+    digitalWrite(PIN_RELAY_2, HIGH);
+    digitalWrite(PIN_RELAY_3, HIGH);
+    digitalWrite(PIN_RELAY_4, HIGH);
+    
     myGLCD.InitLCD();
-    myGLCD.setFont(SmallFont);
-    myGLCD.clrScr();
+    myGLCD.setFont(BigFont);
+    myGLCD.clrScr();        
+    myGLCD.print("Initializing..", CENTER, 60);
     
     FastLED.addLeds<NEOPIXEL, LED_DATA_PIN, RGB>(leds, NUM_LEDS);
+
+//    NewPing::timer_ms(300, ledStrip);
+//    NewPing::timer_ms(100, checkSensors);
+
+//    Timer3.initialize(100000);
+//    Timer3.attachInterrupt(ledStrip);
+
+//    Timer3.initialize(10000);
+//    Timer3.attachInterrupt(getInput);
+
 
     getSensorReadings();
     initializeServos();
     
-    delay(2000);
+    if (mains_voltage > 10.0)
+    {
+        powerFromMains();
+    }
+    else
+    {
+        powerFromBattery();
+    }
+    
+    delay(1000);
     count = 0;
+    cmd = 'Z';
+    led_counter1 = 0;
+}
+
+void powerFromMains()
+{
+    digitalWrite(PIN_RELAY_1, HIGH);
+    digitalWrite(PIN_RELAY_2, HIGH);
+    digitalWrite(PIN_RELAY_3, HIGH);
+    digitalWrite(PIN_RELAY_4, LOW);
+    
+    bPowerFromMains = true;
+    bPowerFromBattery = false;
+
+    idle_start = 50;
+    idle_end   = idle_start + 50;
+}
+
+void powerFromBattery()
+{
+    digitalWrite(PIN_RELAY_1, LOW);
+    digitalWrite(PIN_RELAY_2, HIGH);
+    digitalWrite(PIN_RELAY_3, HIGH);
+    digitalWrite(PIN_RELAY_4, HIGH);
+
+    bPowerFromMains = false;
+    bPowerFromBattery = true;
+
+    idle_start = 300;
+    idle_end   = idle_start + 10;
+}
+
+void powerFromBothMainsAndBattery()
+{
+    digitalWrite(PIN_RELAY_1, HIGH);
+    digitalWrite(PIN_RELAY_2, HIGH);
+    digitalWrite(PIN_RELAY_3, HIGH);
+    digitalWrite(PIN_RELAY_4, HIGH);
+
+    bPowerFromMains = true;
+    bPowerFromBattery = true;
+    
+}
+
+void showPowerStatus()
+{
+    if (bPowerFromMains)
+    {
+        myGLCD.setColor(255, 0, 0);
+        myGLCD.fillRect(0, 0, 159, 50);
+        myGLCD.setColor(0, 0, 0);
+        myGLCD.print("Mains: On", LEFT, 20);
+    }
+    else
+    {
+        myGLCD.setColor(0, 0, 0);
+        myGLCD.fillRect(0, 0, 159, 50);
+        myGLCD.setColor(255, 255, 255);
+        myGLCD.print("Mains: Off", LEFT, 20);
+    }
+
+    if (bPowerFromBattery)
+    {
+        myGLCD.setColor(255, 0, 0);
+        myGLCD.fillRect(160, 0, 319, 50);
+        myGLCD.setColor(0, 0, 0);
+        myGLCD.print("Batt: On", RIGHT, 20);
+    }
+    else
+    {
+        myGLCD.setColor(0, 0, 0);
+        myGLCD.fillRect(160, 0, 319, 50);
+        myGLCD.setColor(255, 255, 255);
+        myGLCD.print("Batt: Off", RIGHT, 20);
+    }
 }
 
 void ledStrip(void)
@@ -501,9 +616,11 @@ void ledStrip(void)
     int p;
     int color1,color2;
 
-    count++;
+//    count++;
     
-    if (cmd == 'F' ) {
+    switch(cmd)
+    {
+        case 'F':
         if (bForwardCheck) {
             color1 = Color1;
             color2 = Color2;
@@ -512,7 +629,7 @@ void ledStrip(void)
             color2 = Color4;
         }
       
-        for (p=0;p<22;p=p+4) {
+        for (p=0;p<22;p=p+8) {
             leds[LeftLEDs[p]]    = (ledPos == 0)?color2:color1;
             leds[LeftLEDs[p+1]]  = (ledPos == 1)?color2:color1;
             leds[LeftLEDs[p+2]]  = (ledPos == 2)?color2:color1;
@@ -522,7 +639,9 @@ void ledStrip(void)
             leds[RightLEDs[p+2]] = (ledPos == 2)?color2:color1;
             leds[RightLEDs[p+3]] = (ledPos == 3)?color2:color1;
         }
-    } else if (cmd == 'B' ) {
+        break;
+        
+        case 'B':
         if (bReverseCheck) {
             color1 = Color1;
             color2 = Color2;
@@ -531,7 +650,7 @@ void ledStrip(void)
             color2 = Color4;
         }
       
-        for (p=21;p>0;p=p-4) {
+        for (p=21;p>0;p=p-8) {
             leds[LeftLEDs[p]]    = (ledPos == 0)?color2:color1;
             leds[LeftLEDs[p-1]]  = (ledPos == 1)?color2:color1;
             leds[LeftLEDs[p-2]]  = (ledPos == 2)?color2:color1;
@@ -541,7 +660,9 @@ void ledStrip(void)
             leds[RightLEDs[p-2]] = (ledPos == 2)?color2:color1;
             leds[RightLEDs[p-3]] = (ledPos == 3)?color2:color1;
         }
-    } else if (cmd == 'G' ) {
+        break;
+        
+        case 'G':
         if (bForwardLeftCheck) {
             color1 = Color1;
             color2 = Color2;
@@ -560,7 +681,9 @@ void ledStrip(void)
             leds[BackLEDs[p-2]] = Color1;
             leds[BackLEDs[p-3]] = Color1;
         }
-    } else if (cmd == 'I' ) {
+        break;
+        
+        case 'I':
         if (bForwardRightCheck) {
             color1 = Color1;
             color2 = Color2;
@@ -579,9 +702,9 @@ void ledStrip(void)
             leds[BackLEDs[p+2]]  = Color1;
             leds[BackLEDs[p+3]]  = Color1;
         }
-    }
-    else if (cmd == 'J' )
-    {
+        break;
+        
+        case 'J':
         if (bReverseRightCheck) {
             color1 = Color1;
             color2 = Color2;
@@ -600,9 +723,9 @@ void ledStrip(void)
                 leds[FrontLEDs[p-2]] = Color1;
                 leds[FrontLEDs[p-3]] = Color1;
         }
-    }
-    else if (cmd == 'H' )
-    {
+        break;
+        
+        case 'H':
         if (bReverseRightCheck) {
             color1 = Color1;
             color2 = Color2;
@@ -621,80 +744,87 @@ void ledStrip(void)
             leds[FrontLEDs[p+2]] = Color1;
             leds[FrontLEDs[p+3]] = Color1;
         }
-    }  
-    else if (led_cmd == 'Z' )
-    {
-        myGLCD.clrScr();
-        for (p=0;p<44;p++) {
-            leds[p]   = CRGB::Black;
-        }
-        led_cmd = ' ';
-    }
-    else if (led_cmd == 'A' )
-    {
-        char lcd_str[256];
-        myGLCD.setFont(BigFont);
-        sprintf(lcd_str, "Hi there...");
-        myGLCD.print(lcd_str, CENTER, 100);
+        break;
+        
+        case 'A':
         
         color1 = Color5;
         color2 = Color6;
       
         for (p=0;p<44;p++) {
              leds[p] = ((p % 4) == ledPos)?color2:color1;
-         }
-    }
-    else 
-    {
+        }
+        break;
+
+        case 'Z':
+        for (p=0;p<44;p++) {
+            leds[p]   = CRGB::Black;
+        }
+        cmd = ' ';
+        break;
+         
+        default:
         /*
         ** light up the LEDs if the car has been idle for more than
         ** idle_start and let it lit up till idle_end.
         */
         led_counter1++;
-        if (led_counter1 > idle_start)
+        if (led_counter1 >= idle_start)
         {
-            char lcd_str[256];
-            float tempC;
-            myGLCD.setFont(BigFont);
-
             color1 = htmlcolorcode[led_color1];
             color2 = htmlcolorcode[led_color2];
-//            color1 = Color5;
-//            color2 = Color6;
+            
+
+            if (led_counter1 == idle_start)
+            {
+                bGetSensorReadings = true;
+            }
+
+            if (bPowerFromMains && !bPowerFromBattery)
+            {
+                for (p=0;p<44;p++) {
+                    leds[p]   = ((p % 4) == ledPos)?color2:color1;
+                }
+            }
+            else
+            {
+                for (p=0;p<44;p++) {
+                    leds[p]   = CRGB::Black;
+                }
+            }
 
             if (led_counter1 > idle_end) {
-//                led_color1 = random(0,142);
-//                led_color2 = random(0,142);
-                led_cmd = 'Z';
+                myGLCD.clrScr();
+                for (p=0;p<44;p++) {
+                    leds[p]   = CRGB::Black;
+                }
                 led_counter1 = 0;
+                if (bFrontLights)
+                    bFrontLights = false;
+                if (bBackLights)
+                    bBackLights = false;
             }
-            else if ((led_counter1 + 30) > idle_end) {
-                myGLCD.setColor(0,255, 0);
-                sprintf(lcd_str, "ZZZzzz...");
-                myGLCD.print(lcd_str, CENTER, 200);
-            }
-            else {
-             
-                myGLCD.setColor(255, 0, 0);
-                sprintf(lcd_str, "On standby. %d %d", led_color1, led_color2);
-                myGLCD.print(lcd_str, CENTER, 100);
-            }
-                        
-            
-            led_counter2++;
-            if (led_counter2 > 25) {
-                led_color1 = random(0,142);
-                led_color2 = random(0,142);
 
-                led_counter2 = 0;
-            }
-      
-            for (p=0;p<44;p++) {
-                leds[p]   = ((p % 4) == ledPos)?color2:color1;
-            }
+            led_counter2++;
         }
     }
     
+    if (bFrontLights)
+    {
+        for (i=0;i<8;i++)
+        {
+            leds[FrontLightLEDs[i]] = CRGB::White;
+        }
+    }
+    
+    if (bBackLights)
+    {
+        for (i=0;i<8;i++)
+        {
+            leds[BackLightLEDs[i]] = CRGB::White;
+        }
+    }
+
     FastLED.show();
     
     ledPos++;
@@ -728,29 +858,26 @@ void detach_back_sensor_servo()
 
 void checkSensors(void)
 {
-    if (cmd == 'F')
+    switch (cmd)
     {
-        check_forward();
-    }
-    else if (cmd == 'B')
-    {
-        check_reverse();
-    }
-    else if (cmd == 'G')
-    {
-        check_forward_left();
-    }
-    else if (cmd == 'I')
-    {
-        check_forward_right();
-    }
-    else if (cmd == 'H')
-    {
-        check_reverse_left();
-    }
-    else if (cmd == 'J')
-    {
-        check_reverse_right();
+        case 'F':
+            check_forward();
+            break;
+        case 'B':
+            check_reverse();
+            break;
+        case 'G':
+            check_forward_left();
+            break;
+        case 'I':
+            check_forward_right();
+            break;
+        case 'H':
+            check_reverse_left();
+            break;
+        case 'J':
+            check_reverse_right();
+            break;
     }
 
     servoPos++;
@@ -761,8 +888,10 @@ void checkSensors(void)
 
 boolean check_forward() 
 {
+    attach_front_sensor_servo();
     FrontServo.write(ForwardServoPos[servoPos]);
     delay(50);
+    detach_front_sensor_servo();
 
     if(digitalRead(FRONT_OBSTACLE_AVOIDANCE_SENSOR))  {
         bObstacle = true; 
@@ -803,8 +932,10 @@ boolean check_forward()
 
 boolean check_forward_left() 
 {
+    attach_front_sensor_servo();
     FrontServo.write(ForwardLeftServoPos[servoPos]);
     delay(50);
+    detach_front_sensor_servo();
 
     if(digitalRead(FRONT_OBSTACLE_AVOIDANCE_SENSOR))  {
         bObstacle = true; 
@@ -845,8 +976,10 @@ boolean check_forward_left()
 
 boolean check_forward_right() 
 {
+    attach_front_sensor_servo();
     FrontServo.write(ForwardRightServoPos[servoPos]);
     delay(50);
+    detach_front_sensor_servo();
 
     if(digitalRead(FRONT_OBSTACLE_AVOIDANCE_SENSOR))  {
         bObstacle = true; 
@@ -887,8 +1020,10 @@ boolean check_forward_right()
 
 boolean check_reverse() 
 {
+    attach_back_sensor_servo();
     BackServo.write(BackwardServoPos[servoPos]);
     delay(50);
+    detach_back_sensor_servo();
 
     if(digitalRead(BACK_OBSTACLE_AVOIDANCE_SENSOR))  {
         bObstacle = true; 
@@ -929,8 +1064,10 @@ boolean check_reverse()
 
 boolean check_reverse_left() 
 {
+    attach_back_sensor_servo();
     BackServo.write(BackwardLeftServoPos[servoPos]);
     delay(50);
+    detach_back_sensor_servo();
 
     if(digitalRead(BACK_OBSTACLE_AVOIDANCE_SENSOR))  {
         bObstacle = true; 
@@ -971,8 +1108,10 @@ boolean check_reverse_left()
 
 boolean check_reverse_right() 
 {
+    attach_back_sensor_servo();
     BackServo.write(BackwardRightServoPos[servoPos]);
     delay(50);
+    detach_back_sensor_servo();
 
     if(digitalRead(BACK_OBSTACLE_AVOIDANCE_SENSOR))  {
         bObstacle = true; 
@@ -1022,11 +1161,19 @@ void wsend(char c)
 void stop()
 {
     wsend('S');
+/*    if (bFrontSensorServoAttached)
+        detach_front_sensor_servo();
+    if (bBackSensorServoAttached)
+        detach_back_sensor_servo();
+*/    if (bPanSensorServoAttached)
+        detach_pan_sensor_servo();
+    if (bTiltSensorServoAttached)
+        detach_tilt_sensor_servo();
 }
 
 void forward()
 {
-    if (bForwardCheck) {
+    if (bForwardCheck  || bDockingMode) {
         wsend('F');
     } else {
         stop();
@@ -1035,17 +1182,16 @@ void forward()
 
 void forward_left()
 {
-    if (bForwardLeftCheck) {
+    if (bForwardLeftCheck || bDockingMode) {
         wsend('G');
     } else {
         stop();
     }
 }
 
-
 void forward_right()
 {
-    if (bForwardRightCheck) {
+    if (bForwardRightCheck || bDockingMode) {
         wsend('I');
     } else {
         stop();
@@ -1054,7 +1200,7 @@ void forward_right()
 
 void reverse()
 {
-    if (bReverseCheck) {
+    if (bReverseCheck || bDockingMode) {
         wsend('B');
     } else {
         stop();
@@ -1063,8 +1209,17 @@ void reverse()
 
 void reverse_left()
 {
-    if (bReverseLeftCheck) {
+    if (bReverseLeftCheck || bDockingMode) {
         wsend('H');
+    } else {
+        stop();
+    }
+}
+
+void reverse_right()
+{
+    if (bReverseRightCheck || bDockingMode) {
+        wsend('J');
     } else {
         stop();
     }
@@ -1094,15 +1249,6 @@ void detach_tilt_sensor_servo()
     bTiltSensorServoAttached = false;
 }
 
-
-void reverse_right()
-{
-    if (bReverseRightCheck) {
-        wsend('J');
-    } else {
-        stop();
-    }
-}
 void camera_up()
 {
     if (TiltServoPosition > 40)
@@ -1145,169 +1291,234 @@ void camera_right()
 
 void getInput(void)
 {
-    int serial_count = 0;
+    serial_count = 0;
     
-    if (Serial3.available() || Serial.available())
-    {
-        led_counter1 = 0;
-
+//    if (Serial3.available() || Serial.available())
+//    {
         // Dont try to process each and every command.  Otherwise
         // the arduino may be busy for a long time after the user
         // has released a command button.
-        while (Serial3.available() && serial_count < 10)
+        while (Serial3.available() && serial_count < 50)
         {
             serial_count++;
             temp_cmd = Serial3.read();
             if (strchr(ACCEPTED_INPUTS, temp_cmd))
             {
-                Serial.print("btemp_cmd: ");Serial.print(temp_cmd);Serial.print(" ");Serial.println(count);
                 cmd = temp_cmd;
+                led_counter1 = 0;
                 count = 0;
-                Serial.print("bcmd: ");Serial.print(cmd);Serial.print(" ");Serial.println(count);
-            }
-            else
-            {
-                Serial.print("binv temp_cmd: ");Serial.print(temp_cmd);Serial.print(" ");Serial.println(count);
+//                Serial.print("bcmd: ");Serial.print(cmd);Serial.print(" ");Serial.println(count);
             }
         }
+
+        serial_count = 0;
     
-        while (Serial.available() && serial_count < 10)
+        while (Serial.available() && serial_count < 50)
         {
             serial_count++;
             temp_cmd = Serial.read();
             if (strchr(ACCEPTED_INPUTS, temp_cmd))
             {
-                Serial.print("temp_cmd: ");Serial.print(temp_cmd);Serial.print(" ");Serial.println(count);
                 cmd = temp_cmd;
+                led_counter1 = 0;
                 count = 0;
-                Serial.print("cmd: ");Serial.print(cmd);Serial.print(" ");Serial.println(count);
-            }
-            else
-            {
-                Serial.print("inv temp_cmd: ");Serial.print(temp_cmd);Serial.print(" ");Serial.println(count);
+//                Serial.print("cmd: ");Serial.print(cmd);Serial.print(" ");Serial.println(count);
             }
         }
-    
-    }
+//    }
 }
 
 void loop() { 
-    char temp_str[256];
-    int serial_count = 0;
-
-    /* 
-    ** Clear LCD screen if no activity for some time.  Otherwise
-    ** there will be a "screen burn in at the place on the screen
-    ** of the last car movement.
-    */
-    if (count > 100)
+    if (bGetSensorReadings)
     {
-        if (bFrontSensorServoAttached)
+        getSensorReadings();
+        showPowerStatus();
+        bGetSensorReadings = false;
+    }
+
+    count++;
+    if (count > 10000)
+    {
+/*        if (bFrontSensorServoAttached)
             detach_front_sensor_servo();
         if (bBackSensorServoAttached)
             detach_back_sensor_servo();
-        if (bPanSensorServoAttached)
+*/        if (bPanSensorServoAttached)
             detach_pan_sensor_servo();
         if (bTiltSensorServoAttached)
             detach_tilt_sensor_servo();
 
-        if (count < 200) {
-            led_cmd = 'Z';
-        }
-        else if ((count > 300) && (count < 350)) {
-            led_cmd = ' ';
-            led_counter1 = 500;
-        }    
+//        cmd = 'S';  
+        count = 0;
+        bGetSensorReadings = false;
+        myGLCD.clrScr();
     }
       
     getInput();
 
+//Serial.print(':');
+//Serial.print(cmd);
+
+/*    if (cmd == ' ')
+    {
+        if (led_counter2 > 25) {
+            led_color1 = random(0,142);
+            led_color2 = random(0,142);
+            led_counter2 = 0;
+        }
+        if (led_counter1 > idle_end) {
+            myGLCD.clrScr();
+        }        
+
+        return;
+    }
+*/    
     if ((cmd == 'F') || (cmd == 'G') || (cmd == 'I')) {
-        if (!bFrontSensorServoAttached)
+/*        if (!bFrontSensorServoAttached)
             attach_front_sensor_servo();
         if (bBackSensorServoAttached)
             detach_back_sensor_servo();
-        if (bPanSensorServoAttached)
+*/        if (bPanSensorServoAttached)
             detach_pan_sensor_servo();
         if (bTiltSensorServoAttached)
             detach_tilt_sensor_servo();
+        bGetSensorReadings = true;
+        checkSensors();
     }
     else if ((cmd == 'B') || (cmd == 'H') || (cmd == 'J')) {
-        if (bFrontSensorServoAttached)
+/*        if (bFrontSensorServoAttached)
             detach_front_sensor_servo();
         if (!bBackSensorServoAttached)
             attach_back_sensor_servo();
-        if (bPanSensorServoAttached)
+*/        if (bPanSensorServoAttached)
             detach_pan_sensor_servo();
         if (bTiltSensorServoAttached)
             detach_tilt_sensor_servo();
+        bGetSensorReadings = true;
+        checkSensors();
     }
     else if ((cmd == 'U') || (cmd == 'D')) {
-        if (bFrontSensorServoAttached)
+/*        if (bFrontSensorServoAttached)
             detach_front_sensor_servo();
         if (bBackSensorServoAttached)
             detach_back_sensor_servo();
-        if (bPanSensorServoAttached)
+*/        if (bPanSensorServoAttached)
             detach_pan_sensor_servo();
         if (!bTiltSensorServoAttached)
             attach_tilt_sensor_servo();
     }
     else if ((cmd == 'L') || (cmd == 'R')) {
-        if (bFrontSensorServoAttached)
+/*        if (bFrontSensorServoAttached)
             detach_front_sensor_servo();
         if (bBackSensorServoAttached)
             detach_back_sensor_servo();
-        if (!bPanSensorServoAttached)
+*/        if (!bPanSensorServoAttached)
             attach_pan_sensor_servo();
         if (bTiltSensorServoAttached)
             detach_tilt_sensor_servo();
     }
-    
-    checkSensors();
 
-   
-    if (cmd == 'F')
+// Serial.println(cmd);    
+    switch (cmd)
     {
-        forward();
-    }
-    else if (cmd == 'B')
-    {
-        reverse();
-    }
-    else if (cmd == 'G')
-    {
-        forward_left();
-    }
-    else if (cmd == 'I')
-    {
-        forward_right();
-    }
-    else if (cmd == 'H')
-    {
-        reverse_left();
-    }
-    else if (cmd == 'J')
-    {
-        reverse_right();
-    }
-    else if (cmd == 'S')
-    {
-        stop();
-    }
-    else if (cmd == 'U')
-    {
-        camera_up();
-    }
-    else if (cmd == 'D')
-    {
-        camera_down();
-    }
-    else if (cmd == 'R')
-    {
-        camera_right();
-    }
-    else if (cmd == 'L')
-    {
-        camera_left();
+        case 'F': 
+            forward();
+            break;
+        case 'B':
+            reverse();
+            break;
+        case 'G': 
+            forward_left(); 
+            break;
+        case 'I':
+            forward_right();
+            break;
+        case 'H':
+            reverse_left();
+            break;
+        case 'J':
+            reverse_right();
+            break;
+        case 'S':
+            stop();
+            bGetSensorReadings = false;
+            cmd = ' ';
+            break;
+        case 'U':
+            camera_up();
+            break;
+        case 'D':
+            camera_down();
+            break;
+        case 'R':
+            camera_right();
+            break;
+        case 'L':
+            camera_left();
+            break;
+        case '1':
+            wsend('1');
+            cmd = ' ';
+            break;
+        case '2':
+            wsend('2');
+            cmd = ' ';
+            break;
+        case '3':
+            wsend('3');
+            cmd = ' ';
+            break;
+        case '4':
+            wsend('4');
+            cmd = ' ';
+            break;
+        case '5':
+            wsend('5');
+            cmd = ' ';
+            break;
+        case '6':
+            wsend('6');
+            cmd = ' ';
+            break;
+        case '7':
+            wsend('7');
+            cmd = ' ';
+            break;
+        case '8':
+            wsend('8');
+            cmd = ' ';
+            break;
+        case '9':
+            wsend('9');
+            cmd = ' ';
+            break;
+        case 'V':
+            powerFromBothMainsAndBattery();
+            delay(50);
+            powerFromBattery();
+            cmd = ' ';
+            break;
+        case 'v':
+            powerFromBothMainsAndBattery();
+            delay(50);
+            powerFromMains();
+            cmd = ' ';
+            break;
+        case 'X':
+            bDockingMode = true;
+            cmd = ' ';
+            break;
+        case 'x':
+            bDockingMode = false;
+            cmd = ' ';
+            break;
+        case 'W':
+            bFrontLights = true;
+            cmd = ' ';
+            break;
+        case 'w':
+            bFrontLights = false;
+            cmd = ' ';
+            break;
     }
 }
