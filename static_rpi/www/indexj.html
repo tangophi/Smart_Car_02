@@ -1,0 +1,63 @@
+<html>
+<head>
+<script Language="Javascript">
+function up()
+{
+    document.location="cgi-bin/up.cgi";
+}
+function down()
+{
+    document.location="cgi-bin/down.cgi";
+}
+function left()
+{
+    document.location="cgi-bin/left.cgi";
+}
+function right()
+{
+    document.location="cgi-bin/right.cgi";
+}
+function stop()
+{
+    document.location="cgi-bin/stop.cgi";
+}
+</script>
+</head>
+<body>
+    <TABLE BORDER=0 align="center">
+        <td>
+            <TABLE BORDER = 0>
+                <tr>
+                    <td align="center">
+                        <img src="http://192.168.0.153:8080/?action=stream" width="640" height="480"/>
+                    </td> 
+                </tr>
+            </TABLE>
+        </td> 
+        <td>
+            <TABLE BORDER = 0>
+                <tr>
+                    <th> Static Camera </th>
+                </tr>
+                <tr>
+                    <td align="center">
+                        <img src="/up.jpg" width="70" height="62" id="U" onmousedown="up()" onmouseup="stop(event)" onmouseout="stop(event)">
+                    </td>
+                </tr>
+                <tr>
+                    <td align="center">
+                        <img src="/left.jpg" width="70" height="62" id="L" onmousedown="left()" onmouseup="stop(event)" onmouseout="stop(event)">
+                        <img src="/right.jpg" width="70" height="62" id="R" onmousedown="right()" onmouseup="stop(event)" onmouseout="stop(event)">
+                    </td>
+                </tr>
+                <tr>
+                    <td align="center">
+                        <img src="/down.jpg" width="70" height="62" id="D" onmousedown="down()" onmouseup="stop(event)" onmouseout="stop(event)">
+                    </td> 
+                </tr>
+            </TABLE>
+        </td> 
+    </TABLE>
+</body>
+</html>
+
